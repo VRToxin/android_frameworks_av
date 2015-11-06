@@ -202,7 +202,7 @@ status_t convertMetaDataToMessage(
     }
 
     int32_t fps;
-    if (meta->findInt32(kKeyFrameRate, &fps)) {
+    if (meta->findInt32(kKeyFrameRate, &fps) && fps > 0) {
         msg->setInt32("frame-rate", fps);
     }
 
@@ -466,9 +466,11 @@ status_t convertMetaDataToMessage(
     FFMPEGSoftCodec::convertMetaDataToMessageFF(meta, &msg);
     *format = msg;
 
+#if 0
     ALOGI("convertMetaDataToMessage from:");
     meta->dumpToLog();
     ALOGI("  to: %s", msg->debugString(0).c_str());
+#endif
 
     return OK;
 }
@@ -684,7 +686,7 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     }
 
     int32_t fps;
-    if (msg->findInt32("frame-rate", &fps)) {
+    if (msg->findInt32("frame-rate", &fps) && fps > 0) {
         meta->setInt32(kKeyFrameRate, fps);
     }
 
@@ -719,8 +721,10 @@ void convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
 
     FFMPEGSoftCodec::convertMessageToMetaDataFF(msg, meta);
 
+#if 0
     ALOGI("convertMessageToMetaData from %s to:", msg->debugString(0).c_str());
     meta->dumpToLog();
+#endif
 }
 
 AString MakeUserAgent() {
