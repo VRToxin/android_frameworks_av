@@ -315,6 +315,9 @@ static const char *FourCC2MIME(uint32_t fourcc) {
         case FOURCC('m', 'p', '4', 'a'):
             return MEDIA_MIMETYPE_AUDIO_AAC;
 
+        case FOURCC('e', 'n', 'c', 'a'):
+            return MEDIA_MIMETYPE_AUDIO_AAC;
+
         case FOURCC('.', 'm', 'p', '3'):
             return MEDIA_MIMETYPE_AUDIO_MPEG;
 
@@ -325,6 +328,9 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_AUDIO_AMR_WB;
 
         case FOURCC('m', 'p', '4', 'v'):
+            return MEDIA_MIMETYPE_VIDEO_MPEG4;
+
+        case FOURCC('e', 'n', 'c', 'v'):
             return MEDIA_MIMETYPE_VIDEO_MPEG4;
 
         case FOURCC('s', '2', '6', '3'):
@@ -841,7 +847,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             && chunk_type != FOURCC('c', 'o', 'v', 'r')
             && mPath.size() == 5 && underMetaDataPath(mPath)) {
         off64_t stop_offset = *offset + chunk_size;
-        *offset = stop_offset;
+        *offset = data_offset;
         while (*offset < stop_offset) {
             status_t err = parseChunk(offset, depth + 1);
             if (err != OK) {
@@ -1712,6 +1718,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     }
                 }
             }
+
+            updateVideoTrackInfoFromESDS_MPEG4Video(mLastTrack->meta);
+
             break;
         }
 

@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+#ifdef __LP64__
+#define OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
+#endif
+
 //#define LOG_NDEBUG 0
 #define LOG_TAG "FFMPEGSoftCodec"
 #include <utils/Log.h>
@@ -69,6 +73,7 @@ static const MetaKeyEntry MetaKeyTable[] {
    {kKeyWMAVersion           , "wma-version"            , INT32},  // int32_t
    {kKeyWMVVersion           , "wmv-version"            , INT32},
    {kKeyPCMFormat            , "pcm-format"             , INT32},
+   {kKeyDivXVersion          , "divx-version"           , INT32},
 };
 
 const char* FFMPEGSoftCodec::getMsgKey(int key) {
@@ -250,6 +255,13 @@ status_t FFMPEGSoftCodec::setVideoFormat(
         *compressionFormat = (OMX_VIDEO_CODINGTYPE)OMX_VIDEO_CodingFLV1;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime)) {
         *compressionFormat = (OMX_VIDEO_CODINGTYPE)OMX_VIDEO_CodingDIVX;
+#ifdef QCOM_HARDWARE
+    // compressionFormat will be override later
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mime)) {
+        *compressionFormat = (OMX_VIDEO_CODINGTYPE)OMX_VIDEO_CodingDIVX;
+    } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
+        *compressionFormat = (OMX_VIDEO_CODINGTYPE)OMX_VIDEO_CodingDIVX;
+#endif
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_HEVC, mime)) {
         *compressionFormat = (OMX_VIDEO_CODINGTYPE)OMX_VIDEO_CodingHEVC;
     } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_FFMPEG, mime)) {
@@ -270,7 +282,7 @@ status_t FFMPEGSoftCodec::setVideoFormat(
     // from the CAF L release. It was unfortunately moved to a proprietary
     // blob and an architecture which is hellish for OEMs who wish to
     // customize the platform.
-    if (err != BAD_TYPE && (strncmp(componentName, "OMX.qcom.", 9) == 0)) {
+    if (err != BAD_TYPE && (!strncmp(componentName, "OMX.qcom.", 9))) {
         status_t xerr = OK;
 
         int32_t mode = 0;
@@ -289,6 +301,14 @@ status_t FFMPEGSoftCodec::setVideoFormat(
                 (void *)&portFmt, sizeof(portFmt));
         if (xerr != OK) {
             ALOGW("Failed to set frame packing format on component");
+        }
+
+        if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime) ||
+                !strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mime) ||
+                !strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
+            // Override with QCOM specific compressionFormat
+            *compressionFormat = (OMX_VIDEO_CODINGTYPE)QOMX_VIDEO_CodingDivx;
+            setQCDIVXFormat(msg, mime, OMXhandle, nodeID, kPortIndexOutput);
         }
 
         // Enable timestamp reordering for mpeg4 and vc1 codec types, the AVI file
@@ -330,7 +350,7 @@ status_t FFMPEGSoftCodec::setVideoFormat(
 
             xerr = OMXhandle->setParameter(
                     nodeID, (OMX_INDEXTYPE)OMX_QcomIndexEnableExtnUserData,
-                    (OMX_PTR)&enableType, sizeof(enableType));
+                    &enableType, sizeof(enableType));
             if (xerr != OK) {
                 ALOGW("[%s] Failed to enable user-extradata", componentName);
             }
@@ -339,6 +359,54 @@ status_t FFMPEGSoftCodec::setVideoFormat(
 #endif
     return err;
 }
+
+#ifdef QCOM_HARDWARE
+status_t FFMPEGSoftCodec::setQCDIVXFormat(
+        const sp<AMessage> &msg, const char* mime, sp<IOMX> OMXhandle,
+        IOMX::node_id nodeID, int port_index) {
+    status_t err = OK;
+    ALOGV("Setting the QOMX_VIDEO_PARAM_DIVXTYPE params ");
+    QOMX_VIDEO_PARAM_DIVXTYPE paramDivX;
+    InitOMXParams(&paramDivX);
+    paramDivX.nPortIndex = port_index;
+    int32_t DivxVersion = 0;
+    if (!msg->findInt32(getMsgKey(kKeyDivXVersion), &DivxVersion)) {
+        // Cannot find the key, the caller is skipping the container
+        // and use codec directly, let determine divx version from
+        // mime type
+        DivxVersion = kTypeDivXVer_4;
+        const char *v;
+        if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX, mime) ||
+                !strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX4, mime)) {
+            DivxVersion = kTypeDivXVer_4;
+            v = "4";
+        } else if (!strcasecmp(MEDIA_MIMETYPE_VIDEO_DIVX311, mime)) {
+            DivxVersion = kTypeDivXVer_3_11;
+            v = "3.11";
+        }
+        ALOGW("Divx version key missing, initializing the version to %s", v);
+    }
+    ALOGV("Divx Version Type %d", DivxVersion);
+
+    if (DivxVersion == kTypeDivXVer_4) {
+        paramDivX.eFormat = QOMX_VIDEO_DIVXFormat4;
+    } else if (DivxVersion == kTypeDivXVer_5) {
+        paramDivX.eFormat = QOMX_VIDEO_DIVXFormat5;
+    } else if (DivxVersion == kTypeDivXVer_6) {
+        paramDivX.eFormat = QOMX_VIDEO_DIVXFormat6;
+    } else if (DivxVersion == kTypeDivXVer_3_11 ) {
+        paramDivX.eFormat = QOMX_VIDEO_DIVXFormat311;
+    } else {
+        paramDivX.eFormat = QOMX_VIDEO_DIVXFormatUnused;
+    }
+    paramDivX.eProfile = (QOMX_VIDEO_DIVXPROFILETYPE)0;    //Not used for now.
+
+    err =  OMXhandle->setParameter(nodeID,
+            (OMX_INDEXTYPE)OMX_QcomIndexParamVideoDivx,
+            &paramDivX, sizeof(paramDivX));
+    return err;
+}
+#endif
 
 status_t FFMPEGSoftCodec::getVideoPortFormat(OMX_U32 portIndex, int coding,
         sp<AMessage> &notify, sp<IOMX> OMXHandle, IOMX::node_id nodeId) {
@@ -1020,7 +1088,7 @@ status_t FFMPEGSoftCodec::setFLACFormat(
 
     CHECK(msg->findInt32(getMsgKey(kKeyChannelCount), &numChannels));
     CHECK(msg->findInt32(getMsgKey(kKeySampleRate), &sampleRate));
-    CHECK(msg->findInt32(getMsgKey(kKeyBitsPerSample), &bitsPerSample));
+    msg->findInt32(getMsgKey(kKeyBitsPerSample), &bitsPerSample);
 
     ALOGV("Channels: %d, SampleRate: %d BitsPerSample: %d",
             numChannels, sampleRate, bitsPerSample);
