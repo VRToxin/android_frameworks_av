@@ -561,14 +561,13 @@ void NuPlayer::GenericSource::resume() {
 }
 
 void NuPlayer::GenericSource::disconnect() {
-
-    sp<DataSource> dataSource;
-    sp<DataSource> httpSource;
+    sp<DataSource> dataSource, httpSource;
     {
-        Mutex::Autolock _l(mSourceLock);
+        Mutex::Autolock _l(mDisconnectLock);
         dataSource = mDataSource;
         httpSource = mHttpSource;
     }
+
     if (dataSource != NULL) {
         // disconnect data source
         if (dataSource->flags() & DataSource::kIsCachingDataSource) {
