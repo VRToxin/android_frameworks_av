@@ -1306,7 +1306,7 @@ void NuPlayer::onStart(int64_t startPositionUs) {
     ALOGV("onStart");
     sp<MetaData> audioMeta = mSource->getFormatMeta(true /* audio */);
     AVNuUtils::get()->setSourcePCMFormat(audioMeta);
-    audioMeta->dumpToLog();
+
     audio_stream_type_t streamType = AUDIO_STREAM_MUSIC;
     if (mAudioSink != NULL) {
         streamType = mAudioSink->getAudioStreamType();
@@ -1933,9 +1933,6 @@ void NuPlayer::performDecoderFlush(FlushCommand audio, FlushCommand video) {
 
 void NuPlayer::performReset() {
     ALOGV("performReset");
-
-    CHECK(mAudioDecoder == NULL);
-    CHECK(mVideoDecoder == NULL);
 
     cancelPollDuration();
 
