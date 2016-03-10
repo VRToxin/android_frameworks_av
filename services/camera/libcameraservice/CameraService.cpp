@@ -1957,8 +1957,9 @@ void CameraService::BasicClient::disconnect() {
 status_t CameraService::BasicClient::dump(int, const Vector<String16>&) {
     // No dumping of clients directly over Binder,
     // must go through CameraService::dump
-    android_errorWriteWithInfoLog(SN_EVENT_LOG_ID, "26265403",
-            IPCThreadState::self()->getCallingUid(), NULL, 0);
+    // android_errorWriteWithInfoLog(SN_EVENT_LOG_ID, "26265403",
+            // IPCThreadState::self()->getCallingUid(), NULL, 0);
+    ALOGI("26265403 %d",IPCThreadState::self()->getCallingUid());
     return OK;
 }
 
