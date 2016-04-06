@@ -1957,8 +1957,7 @@ int Reverb_command(effect_handle_t  self,
             //        "EFFECT_CMD_GET_PARAM start");
             effect_param_t *p = (effect_param_t *)pCmdData;
             if (SIZE_MAX - sizeof(effect_param_t) < (size_t)p->psize) {
-                 //android_errorWriteLog(0x534e4554, "26347509");
-                ALOGE("26347509");
+                android_errorWriteLog(0x534e4554, "26347509");
                 return -EINVAL;
             }
             if (pCmdData == NULL || cmdSize < sizeof(effect_param_t) ||
